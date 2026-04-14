@@ -1,0 +1,1022 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{titlesec}
+
+\geometry{margin=1in}
+\hypersetup{colorlinks=true, linkcolor=blue!70!black, urlcolor=blue!70!black, citecolor=blue!70!black}
+
+% --- Code style ---
+\definecolor{codebg}{HTML}{F7F7F7}
+\definecolor{codeframe}{HTML}{CCCCCC}
+\definecolor{kwcolor}{HTML}{0000CC}
+\definecolor{strcolor}{HTML}{008800}
+\definecolor{commentcolor}{HTML}{888888}
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kwcolor}\bfseries,
+  stringstyle=\color{strcolor},
+  commentstyle=\color{commentcolor}\itshape,
+  language=Python,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  xleftmargin=1.5em,
+  framexleftmargin=1em,
+  columns=fullflexible,
+}
+\lstset{style=pythonstyle}
+
+% --- Title ---
+\title{\textbf{OWCM Library: Environment Submodule Reference}\\[0.3em]
+\large Mathematical Formulations \& Code Snippets}
+\author{Auto-generated from \texttt{owcm} source code}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%=============================================================================
+\section{Overview}
+%=============================================================================
+
+The \texttt{owcm} library organises optical wireless channel models into five
+\emph{environment submodules}:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Atmospheric} --- fog attenuation, geometric loss, pointing error, turbulence
+  \item \textbf{Indoor} --- Lambertian LoS/NLoS, blockage
+  \item \textbf{Space} --- free-space path loss, deep-space link budget
+  \item \textbf{Underground} --- dust extinction, tunnel LoS, blockage
+  \item \textbf{Underwater} --- extinction, scattering, reflective/retroreflective links
+\end{enumerate}
+
+Each model class exposes three methods:
+\begin{itemize}
+  \item \texttt{gain(link, env)} --- deterministic channel gain $H$ (linear scale)
+  \item \texttt{sample(link, env, n)} --- draw $n$ random samples from the channel
+  \item \texttt{describe()} --- metadata dictionary
+\end{itemize}
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Atmospheric Submodule}
+%=============================================================================
+%=============================================================================
+
+%-----------------------------------------------------------------------------
+\subsection{Attenuation Models}
+%-----------------------------------------------------------------------------
+
+% ---- 1. Beer-Lambert ----
+\subsubsection{Beer--Lambert Attenuation}
+\label{sec:beer_lambert}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "beer\_lambert")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{H_{\text{att}} = e^{-\alpha \, R}}
+\end{equation}
+where $\alpha$ [\si{m^{-1}}] is the extinction coefficient and $R$ [m] is the
+link range.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.core.types import Tx, Rx, Link, Environment
+from owcm.atmospheric.models.attenuation import BeerLambertAttenuation
+
+tx = Tx(wavelength_nm=1550)
+rx = Rx()
+link = Link(tx=tx, rx=rx)        # range_m computed from positions
+env  = Environment()
+
+model = BeerLambertAttenuation(link, env, alpha=0.25)
+H = model.gain(link, env)        # deterministic gain
+print(f"Beer-Lambert gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 2. Kim ----
+\subsubsection{Kim Fog Model}
+\label{sec:kim}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "kim")}
+
+\paragraph{Mathematical form.}
+The specific attenuation in dB/km is:
+\begin{equation}
+A = \frac{3.91}{V} \left(\frac{\lambda}{550}\right)^{-q(V)}
+\quad \text{[dB/km]}
+\end{equation}
+where $V$ is visibility in km, $\lambda$ is wavelength in nm, and $q(V)$ is
+the Kim size-parameter:
+\begin{equation}
+q(V) =
+\begin{cases}
+1.6     & V > 50\text{ km} \\
+1.3     & 6 < V \le 50\text{ km} \\
+0.16V + 0.34 & 1 < V \le 6\text{ km} \\
+V - 0.5 & 0.5 < V \le 1\text{ km} \\
+0       & V \le 0.5\text{ km}
+\end{cases}
+\end{equation}
+The channel gain is then:
+\begin{equation}
+\boxed{H_{\text{Kim}} = \exp\!\left(-\frac{A}{1000}\,R\right)}
+\end{equation}
+with $A$ converted from dB/km to Np/m internally.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import KimFogModel
+
+model = KimFogModel(link, env, visibility_km=2.0)
+H = model.gain(link, env)
+print(f"Kim fog gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 3. Kruse ----
+\subsubsection{Kruse Fog Model}
+\label{sec:kruse}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "kruse")}
+
+\paragraph{Mathematical form.}
+Same attenuation expression as Kim but with a simplified $q$ exponent:
+\begin{equation}
+q(V) =
+\begin{cases}
+1.6                 & V > 50\text{ km} \\
+1.3                 & 6 < V \le 50\text{ km} \\
+0.585\,V^{1/3}      & V \le 6\text{ km}
+\end{cases}
+\end{equation}
+\begin{equation}
+\boxed{H_{\text{Kruse}} = \exp\!\left(-\frac{3.91}{1000\,V}\left(\frac{\lambda}{550}\right)^{-q} R\right)}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import KruseFogModel
+
+model = KruseFogModel(link, env, visibility_km=4.0)
+H = model.gain(link, env)
+print(f"Kruse fog gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 4. Al Naboulsi Convection ----
+\subsubsection{Al Naboulsi Convection Fog}
+\label{sec:al_naboulsi_conv}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "al\_naboulsi\_convection")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{A = \frac{10}{\ln 10}\;\frac{0.11478\,\lambda + 3.8367}{V}
+\quad \text{[dB/km]}}
+\end{equation}
+where $\lambda$ is in \si{\micro m} and $V$ is visibility in km.
+Channel gain from specific attenuation:
+\begin{equation}
+H = \exp\!\left(-\frac{A}{4.343 \times 1000}\,R\right)
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import AlNaboulsiConvection
+
+model = AlNaboulsiConvection(link, env, visibility_km=1.0)
+H = model.gain(link, env)
+print(f"Al Naboulsi (convection) gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 5. Al Naboulsi Advection ----
+\subsubsection{Al Naboulsi Advection Fog}
+\label{sec:al_naboulsi_adv}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "al\_naboulsi\_advection")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{A = \frac{10}{\ln 10}\;\frac{0.18126\,\lambda^2 + 0.13709\,\lambda + 3.7502}{V}
+\quad \text{[dB/km]}}
+\end{equation}
+with identical gain conversion as the convection variant.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import AlNaboulsiAdvection
+
+model = AlNaboulsiAdvection(link, env, visibility_km=0.8)
+H = model.gain(link, env)
+print(f"Al Naboulsi (advection) gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 6. Ijaz ----
+\subsubsection{Ijaz Controlled Fog}
+\label{sec:ijaz}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "ijaz")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+q(\lambda) = 0.1428\,\lambda - 0.0947
+\end{equation}
+\begin{equation}
+\boxed{A = \frac{17}{V}\left(\frac{\lambda}{0.55}\right)^{-q(\lambda)}
+\quad \text{[dB/km]}}
+\end{equation}
+where $\lambda$ is in \si{\micro m}.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import IjazFog
+
+model = IjazFog(link, env, visibility_km=0.5)
+H = model.gain(link, env)
+print(f"Ijaz fog gain = {H:.6f}")
+\end{lstlisting}
+
+% ---- 7. Esmail ----
+\subsubsection{Esmail Unified Fog Regression}
+\label{sec:esmail}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "attenuation", "esmail")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{A = k\,V^{-(a\lambda + b)} \quad \text{[dB/km]}}
+\end{equation}
+The regression constants $k$, $a$, $b$ must be supplied by the user (they are
+\emph{not} hardcoded).
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.attenuation import EsmailFog
+
+model = EsmailFog(link, env,
+                  visibility_km=1.0,
+                  k=14.0, a=0.1, b=0.6)
+H = model.gain(link, env)
+print(f"Esmail fog gain = {H:.6f}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Geometric Loss Models}
+%-----------------------------------------------------------------------------
+
+% ---- 8. Uniform Aperture ----
+\subsubsection{Uniform Aperture Geometric Loss}
+\label{sec:uniform_aperture}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "geometry", "uniform\_aperture")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+D_B = D_T + R\,\theta
+\end{equation}
+\begin{equation}
+\boxed{L_{\text{geom}} = \left(\frac{D_R}{D_B}\right)^2}
+\end{equation}
+where $D_T,\,D_R$ are the transmitter and receiver aperture diameters, $R$ is
+range, and $\theta$ is the beam divergence angle.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.geometry import UniformApertureGeometricLoss
+
+tx = Tx(aperture_diameter_m=0.05, divergence_angle_rad=1e-3)
+rx = Rx(aperture_diameter_m=0.1)
+link = Link(tx=tx, rx=rx)
+model = UniformApertureGeometricLoss(link, env)
+H = model.gain(link, env)
+print(f"Uniform aperture geom. loss = {H:.6e}")
+\end{lstlisting}
+
+% ---- 9. Gaussian Exact ----
+\subsubsection{Gaussian Collected Fraction --- Exact}
+\label{sec:gauss_exact}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "geometry", "gaussian\_collected\_exact")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+w_z = \frac{D_T}{2} + R\,\theta, \quad a = \frac{D_R}{2}
+\end{equation}
+\begin{equation}
+\boxed{A_0 = \left[\operatorname{erf}\!\left(\frac{\sqrt{2}\,a}{w_z}\right)\right]^2}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.geometry import GaussianCollectedFractionExact
+
+model = GaussianCollectedFractionExact(link, env)
+A0 = model.gain(link, env)
+print(f"Gaussian exact A0 = {A0:.6f}")
+\end{lstlisting}
+
+% ---- 10. Gaussian Approx ----
+\subsubsection{Gaussian Collected Fraction --- Approximate}
+\label{sec:gauss_approx}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "geometry", "gaussian\_collected\_approx")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{A_0 \approx 1 - \exp\!\left(-\frac{2a^2}{w_z^2}\right)}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.geometry import GaussianCollectedFractionApprox
+
+model = GaussianCollectedFractionApprox(link, env)
+A0 = model.gain(link, env)
+print(f"Gaussian approx A0 = {A0:.6f}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Pointing Error Models}
+%-----------------------------------------------------------------------------
+
+% ---- 11. Rayleigh-Gaussian ----
+\subsubsection{Rayleigh--Gaussian Pointing Loss}
+\label{sec:rayleigh_gaussian}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "pointing", "rayleigh\_gaussian")}
+
+\paragraph{Mathematical form.}
+The radial jitter $r$ follows a Rayleigh distribution with parameter
+$\sigma_s$.  The instantaneous pointing loss is:
+\begin{equation}
+L_p(r) = \exp\!\left(-\frac{2r^2}{w_{\text{eq}}^2}\right)
+\end{equation}
+The \textbf{mean} pointing gain (returned by \texttt{gain()}) is:
+\begin{equation}
+\boxed{\langle L_p \rangle = \frac{w_{\text{eq}}^2}{w_{\text{eq}}^2 + 4\sigma_s^2}}
+\end{equation}
+The \texttt{sample()} method draws $r \sim \mathrm{Rayleigh}(\sigma_s)$ and
+returns the per-sample loss.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.pointing import RayleighGaussianPointingLoss
+
+model = RayleighGaussianPointingLoss(
+    link, env,
+    jitter_sigma_m=0.01,
+    wz_eq_m=0.1
+)
+mean_gain = model.gain(link, env)
+samples   = model.sample(link, env, n=10000)
+print(f"Mean pointing gain = {mean_gain:.4f}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Turbulence Models}
+%-----------------------------------------------------------------------------
+
+% ---- 12. Log-Normal ----
+\subsubsection{Log-Normal Turbulence}
+\label{sec:lognormal}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "turbulence", "lognormal")}
+
+\paragraph{Mathematical form.}
+Under weak turbulence, the irradiance $I$ follows a log-normal distribution:
+\begin{equation}
+\ln I \sim \mathcal{N}\!\left(-\tfrac{1}{2}\sigma_R^2,\;\sigma_R^2\right)
+\end{equation}
+so that $\mathbb{E}[I]=1$.
+\begin{equation}
+\boxed{h_t = \exp\!\left(\mathcal{N}\!\left(-\tfrac{\sigma_R^2}{2},\;\sigma_R^2\right)\right)}
+\end{equation}
+\texttt{gain()} returns 1 (mean); \texttt{sample()} draws random fading
+realisations.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.turbulence import LogNormalTurbulence
+
+model = LogNormalTurbulence(link, env, sigma_R2=0.3)
+samples = model.sample(link, env, n=10000)
+print(f"Mean of samples = {samples.mean():.4f}")
+\end{lstlisting}
+
+% ---- 13. Gamma-Gamma ----
+\subsubsection{Gamma--Gamma Turbulence}
+\label{sec:gamma_gamma}
+
+\paragraph{Registry key.} \texttt{("atmospheric", "turbulence", "gamma\_gamma")}
+
+\paragraph{Mathematical form.}
+For moderate-to-strong turbulence, the irradiance is the product of two
+independent Gamma random variables:
+\begin{equation}
+I = X \cdot Y, \quad
+X \sim \Gamma(\alpha,\,1/\alpha), \quad
+Y \sim \Gamma(\beta,\,1/\beta)
+\end{equation}
+\begin{equation}
+\boxed{f_I(I) = \frac{2(\alpha\beta)^{(\alpha+\beta)/2}}
+{\Gamma(\alpha)\,\Gamma(\beta)}\;
+I^{(\alpha+\beta)/2-1}\;
+K_{\alpha-\beta}\!\left(2\sqrt{\alpha\beta\,I}\right)}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.atmospheric.models.turbulence import GammaGammaTurbulence
+
+model = GammaGammaTurbulence(link, env, gg_alpha=4.0, gg_beta=1.5)
+samples = model.sample(link, env, n=10000)
+print(f"Gamma-Gamma mean = {samples.mean():.4f}")
+\end{lstlisting}
+
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Indoor Submodule}
+%=============================================================================
+%=============================================================================
+
+%-----------------------------------------------------------------------------
+\subsection{LoS Models}
+%-----------------------------------------------------------------------------
+
+% ---- 14. Lambertian LoS ----
+\subsubsection{Lambertian LoS Channel Gain}
+\label{sec:indoor_lambertian_los}
+
+\paragraph{Registry key.} \texttt{("indoor", "los", "lambertian\_los")}
+
+\paragraph{Mathematical form.}
+(FSO\_Survey Eq.\,27--31.)  The Lambertian order is:
+\begin{equation}
+m = -\frac{\ln 2}{\ln(\cos \phi_{1/2})}
+\end{equation}
+The radiation intensity pattern is:
+\begin{equation}
+R_o(\phi) = \frac{m+1}{2\pi}\,\cos^m(\phi)
+\end{equation}
+The optical concentrator gain is:
+\begin{equation}
+g(\omega) = \frac{n^2}{\sin^2(\omega_c)}, \quad 0 \le \omega \le \omega_c
+\end{equation}
+The LoS DC gain is:
+\begin{equation}
+\boxed{H_{\text{LoS}} = \frac{A_d}{d^2}\;R_o(\phi_0)\;\cos(\omega_0)\;T_s(\omega_0)\;g(\omega_0),
+\quad \omega_0 \le \omega_c}
+\end{equation}
+where $A_d$ is the physical detector area, $d$ is the Tx--Rx distance,
+$\phi_0$ is the irradiance angle, $\omega_0$ is the incidence angle,
+$\omega_c$ is the receiver FOV half-angle, $T_s$ is the optical filter gain,
+and $n$ is the refractive index of the concentrator.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.indoor.models.all_models import IndoorLambertianLoS
+
+tx  = Tx(position=np.array([2.5, 2.5, 3.0]),
+         wavelength_nm=850,
+         aperture_diameter_m=0.01)
+rx  = Rx(position=np.array([1.0, 1.0, 0.85]),
+         aperture_diameter_m=0.01,
+         field_of_view_rad=np.deg2rad(60))
+link = Link(tx=tx, rx=rx)
+env  = Environment(params={"cos_phi": 0.95, "cos_psi": 0.90})
+
+model = IndoorLambertianLoS(link, env,
+    semi_angle_half_power_rad=np.deg2rad(60),
+    concentrator_refractive_index=1.5,
+    optical_filter_gain=1.0)
+H = model.gain(link, env)
+print(f"Indoor LoS gain = {H:.6e}")
+\end{lstlisting}
+
+% ---- 15. Lambertian LoS+NLoS ----
+\subsubsection{Lambertian LoS + NLoS Combined}
+\label{sec:indoor_los_nlos}
+
+\paragraph{Registry key.} \texttt{("indoor", "los", "lambertian\_los\_plus\_nlos")}
+
+\paragraph{Mathematical form.}
+(FSO\_Survey Eq.\,37.)
+\begin{equation}
+\boxed{H = H_{\text{LoS}} + H_{\text{NLoS}}}
+\end{equation}
+Internally instantiates both \texttt{IndoorLambertianLoS} and
+\texttt{KBounceNLoS} and sums their gains.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.indoor.models.all_models import IndoorLambertianLoSPlusNLoS
+
+model = IndoorLambertianLoSPlusNLoS(link, env,
+    semi_angle_half_power_rad=np.deg2rad(60),
+    reflectance=0.7, room_area_m2=25.0, n_bounces=3)
+H = model.gain(link, env)
+print(f"LoS + NLoS combined gain = {H:.6e}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{NLoS Models}
+%-----------------------------------------------------------------------------
+
+% ---- 16. K-Bounce ----
+\subsubsection{K-Bounce Diffuse NLoS}
+\label{sec:kbounce}
+
+\paragraph{Registry key.} \texttt{("indoor", "nlos", "kbounce")}
+
+\paragraph{Mathematical form.}
+(FSO\_Survey Eq.\,32--36.)  The single-bounce differential gain from a
+reflector patch $\Delta A$ is:
+\begin{equation}
+\mathrm{d}H_1 = \frac{A_d}{d_{S_k}^2 \, d_{R_k}^2}\;
+R_o(\phi_{S_k})\;\rho\;\Delta A\;
+\cos(\omega_{S_k})\;\cos(\phi_{R_k})\;\cos(\omega_{R_k})\;T_s\;g
+\end{equation}
+For $K$ bounces, gains are accumulated with a geometric decay factor $\rho$:
+\begin{equation}
+\boxed{H_{\text{NLoS}} = \sum_{k=1}^{K} H_1 \cdot \rho^{k-1}}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.indoor.models.all_models import KBounceNLoS
+
+model = KBounceNLoS(link, env,
+    reflectance=0.7,
+    room_area_m2=25.0,
+    n_bounces=3,
+    ceiling_height_m=3.0)
+H = model.gain(link, env)
+print(f"K-bounce NLoS gain = {H:.6e}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Blockage Models}
+%-----------------------------------------------------------------------------
+
+% ---- 17. On-Off Blockage ----
+\subsubsection{On--Off Blockage}
+\label{sec:onoff_blockage}
+
+\paragraph{Registry key.} \texttt{("indoor", "blockage", "onoff")}
+
+\paragraph{Mathematical form.}
+The link is either fully blocked or unblocked:
+\begin{equation}
+H_b \sim \text{Bernoulli}(1 - p_{\text{blocked}})
+\end{equation}
+\begin{equation}
+\boxed{\langle H_b \rangle = 1 - p_{\text{blocked}}}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.indoor.models.all_models import OnOffBlockage
+
+model = OnOffBlockage(link, env, p_blocked=0.15)
+mean_gain = model.gain(link, env)      # 0.85
+samples   = model.sample(link, env, n=1000)
+\end{lstlisting}
+
+% ---- 18. Markov Blockage ----
+\subsubsection{Markov Chain Blockage}
+\label{sec:markov_blockage}
+
+\paragraph{Registry key.} \texttt{("indoor", "blockage", "markov")}
+
+\paragraph{Mathematical form.}
+Two-state Markov chain with transition probabilities:
+\begin{equation}
+p_{01} = P(\text{unblocked} \to \text{blocked}), \quad
+p_{10} = P(\text{blocked} \to \text{unblocked})
+\end{equation}
+Steady-state unblocked probability:
+\begin{equation}
+\boxed{\pi_{\text{unblocked}} = \frac{p_{10}}{p_{01} + p_{10}}}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.indoor.models.all_models import MarkovBlockage
+
+model = MarkovBlockage(link, env, p_01=0.1, p_10=0.3)
+ss_gain = model.gain(link, env)       # 0.75
+chain   = model.sample(link, env, n=500)
+\end{lstlisting}
+
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Space Submodule}
+%=============================================================================
+%=============================================================================
+
+%-----------------------------------------------------------------------------
+\subsection{Free-Space Path Loss}
+%-----------------------------------------------------------------------------
+
+% ---- 19. FSPL ----
+\subsubsection{Free-Space Path Loss (FSPL)}
+\label{sec:fspl}
+
+\paragraph{Registry key.} \texttt{("space", "free\_space", "fspl")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{L_{\text{fs}} = \left(\frac{\lambda}{4\pi R}\right)^2}
+\end{equation}
+where $\lambda$ is wavelength in metres and $R$ is range in metres.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.space.models.free_space import FreeSpacePathLoss
+
+tx = Tx(wavelength_nm=1550,
+        position=np.array([0, 0, 0]))
+rx = Rx(position=np.array([0, 0, 400e3]))
+link = Link(tx=tx, rx=rx)
+model = FreeSpacePathLoss(link, env)
+L = model.gain(link, env)
+print(f"FSPL = {L:.6e}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Deep-Space Link Budget}
+%-----------------------------------------------------------------------------
+
+% ---- 20. Table XIII ----
+\subsubsection{Deep-Space Table XIII Model}
+\label{sec:deepspace}
+
+\paragraph{Registry key.} \texttt{("space", "deepspace", "table\_xiii")}
+
+\paragraph{Mathematical form.}
+(Survey Table XIII, Eq.\,112--116.)
+\begin{align}
+L_{\text{fs}} &= \left(\frac{\lambda}{4\pi R}\right)^2
+  & &\text{(Eq.\,113)} \\[4pt]
+G_t &= \frac{8}{w_0^2}
+  & &\text{(Eq.\,114)} \\[4pt]
+G_r &= \left(\frac{\pi D_R}{\lambda}\right)^2\!(1 - \gamma_r^2)
+  & &\text{(Eq.\,115)} \\[4pt]
+L_{\text{pt}} &= \left(\frac{w_0}{4\sigma_p}\right)^2 p_0
+  & &\text{(Eq.\,116)}
+\end{align}
+The overall channel gain is:
+\begin{equation}
+\boxed{H = G_t \cdot G_r \cdot L_{\text{fs}} \cdot L_a \cdot L_s \cdot L_b
+  \cdot L_{\text{pt}} \cdot \eta_t \cdot \eta_r}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.space.models.deepspace import DeepSpaceTableXIII
+
+tx = Tx(wavelength_nm=1064,
+        position=np.array([0, 0, 0]))
+rx = Rx(aperture_diameter_m=1.0,
+        position=np.array([0, 0, 384.4e6]))  # Moon
+link = Link(tx=tx, rx=rx)
+env = Environment()
+
+model = DeepSpaceTableXIII(link, env,
+    w0_rad=15e-6,       # beam divergence
+    gamma_r=0.1,        # Rx obscuration ratio
+    sigma_p=2e-6,       # pointing jitter
+    p0=0.99, La=0.9, Ls=0.95, Lb=0.98,
+    eta_t=0.9, eta_r=0.85)
+H = model.gain(link, env)
+print(f"Deep-space gain H = {H:.6e}")
+\end{lstlisting}
+
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Underground Submodule}
+%=============================================================================
+%=============================================================================
+
+%-----------------------------------------------------------------------------
+\subsection{LoS Model}
+%-----------------------------------------------------------------------------
+
+% ---- 21. Underground LoS ----
+\subsubsection{Underground Lambertian LoS}
+\label{sec:underground_los}
+
+\paragraph{Registry key.} \texttt{("underground", "los", "lambertian\_los")}
+
+\paragraph{Mathematical form.}
+Simplified inverse-square-law decay for tunnel VLC (Survey Eq.\,57 simplified):
+\begin{equation}
+\boxed{H_{\text{LoS}} = \frac{1}{R^2}}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underground.models.all_models import UndergroundLoS
+
+model = UndergroundLoS(link, env)
+H = model.gain(link, env)
+print(f"Underground LoS gain = {H:.6e}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Dust Extinction}
+%-----------------------------------------------------------------------------
+
+% ---- 22. Dust Extinction ----
+\subsubsection{Exponential Dust Extinction}
+\label{sec:dust_extinction}
+
+\paragraph{Registry key.} \texttt{("underground", "dust", "exp\_extinction")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+\boxed{H_{\text{dust}} = \exp(-k\,C\,R)}
+\end{equation}
+where $C$ is the dust concentration [\si{mg/m^3}], $k$ is the specific
+extinction coefficient [\si{m^{-1}/(mg/m^3)}], and $R$ is range.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underground.models.all_models import DustExtinction
+
+model = DustExtinction(link, env,
+    dust_conc_mg_m3=5.0,
+    dust_k_per_m_per_mg_m3=0.5)
+H = model.gain(link, env)
+print(f"Dust extinction gain = {H:.6f}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Blockage Models}
+%-----------------------------------------------------------------------------
+
+\subsubsection{On--Off Blockage (Underground)}
+\label{sec:ug_onoff}
+
+\paragraph{Registry key.} \texttt{("underground", "blockage", "onoff")}
+
+Identical formulation to the indoor on--off blockage (Sec.\,\ref{sec:onoff_blockage}).
+
+\begin{lstlisting}
+from owcm.underground.models.all_models import OnOffBlockage
+
+model = OnOffBlockage(link, env, p_blocked=0.2)
+H = model.gain(link, env)   # 0.8
+\end{lstlisting}
+
+\subsubsection{Markov Blockage (Underground)}
+\label{sec:ug_markov}
+
+\paragraph{Registry key.} \texttt{("underground", "blockage", "markov")}
+
+Same two-state Markov chain as indoor (Sec.\,\ref{sec:markov_blockage}),
+adapted for tunnel obstructions (machinery, vehicles).
+
+\begin{lstlisting}
+from owcm.underground.models.all_models import MarkovBlockage
+
+model = MarkovBlockage(link, env, p_01=0.15, p_10=0.4)
+H = model.gain(link, env)
+\end{lstlisting}
+
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Underwater Submodule}
+%=============================================================================
+%=============================================================================
+
+%-----------------------------------------------------------------------------
+\subsection{Extinction Models}
+%-----------------------------------------------------------------------------
+
+% ---- 25. a+b Extinction ----
+\subsubsection{Absorption + Scattering Extinction}
+\label{sec:uw_extinction}
+
+\paragraph{Registry key.} \texttt{("underwater", "extinction", "a\_plus\_b")}
+
+\paragraph{Mathematical form.}
+The total extinction coefficient is the sum of absorption and scattering:
+\begin{equation}
+c(\lambda) = a(\lambda) + b(\lambda)
+\end{equation}
+\begin{equation}
+\boxed{H_{\text{ext}} = \exp\!\left(-c\,R\right)}
+\end{equation}
+Default $c = 0.05\;\si{m^{-1}}$ (clear ocean).  Users may supply
+\texttt{attenuation\_c} directly or both \texttt{attenuation\_a} and
+\texttt{attenuation\_b} via \texttt{env.params}.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underwater.models.all_models import UnderwaterExtinction
+
+env = Environment(params={"attenuation_a": 0.02, "attenuation_b": 0.03})
+model = UnderwaterExtinction(link, env)
+H = model.gain(link, env)
+print(f"Underwater extinction gain = {H:.6f}")
+\end{lstlisting}
+
+%-----------------------------------------------------------------------------
+\subsection{Survey Link Models}
+%-----------------------------------------------------------------------------
+
+% ---- 26. Table XI LoS ----
+\subsubsection{Table XI LoS (Eq.\,89)}
+\label{sec:uw_los}
+
+\paragraph{Registry key.} \texttt{("underwater", "link", "los\_case")}
+
+\paragraph{Mathematical form.}
+\begin{equation}
+z = \frac{d}{\cos\theta}
+\end{equation}
+\begin{equation}
+\boxed{P_R = P_T \,\eta_T\,\eta_R \;
+\frac{A_{\text{rec}}\,\cos\theta}{2\pi d^2 (1-\cos\theta_0)}
+\; e^{-c\,z}}
+\end{equation}
+The gain is $H = P_R / P_T$.
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underwater.models.survey_model import TableXILoS
+
+model = TableXILoS(link, env,
+    theta_rad=0.0,
+    theta0_rad=np.deg2rad(10),
+    etaT=0.9, etaR=0.9,
+    attenuation_c=0.05)
+H = model.gain(link, env)
+print(f"Table XI LoS gain = {H:.6e}")
+\end{lstlisting}
+
+% ---- 27. Table XI Retroreflector ----
+\subsubsection{Table XI Retroreflector (Eq.\,90)}
+\label{sec:uw_retro}
+
+\paragraph{Registry key.} \texttt{("underwater", "link", "retroreflective\_case")}
+
+\paragraph{Mathematical form.}
+The round-trip propagation distance is $z = 2d/\cos\theta$.
+\begin{equation}
+\boxed{P_R = P_T\,\eta_T\,\eta_R\,\eta_{\text{retro}}\;
+e^{-c\,z}\;
+\frac{A_{\text{retro}}\cos\theta}
+     {2\pi d^2 (1-\cos\theta_0)}
+\;\frac{A_{\text{rec}}\cos\theta}
+       {\pi (d\tan\theta_{0,r})^2}}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underwater.models.survey_model import TableXIRetro
+
+model = TableXIRetro(link, env,
+    theta_rad=0.0,
+    theta0_rad=np.deg2rad(10),
+    theta0_retro_rad=np.deg2rad(0.5),
+    etaT=0.9, etaR=0.9, etaRetro=0.9,
+    ARetro_m2=0.01,
+    attenuation_c=0.05)
+H = model.gain(link, env)
+print(f"Table XI Retro gain = {H:.6e}")
+\end{lstlisting}
+
+% ---- 28. Table XI Reflective NLoS ----
+\subsubsection{Table XI Reflective NLoS (Eq.\,91--92)}
+\label{sec:uw_reflective}
+
+\paragraph{Registry key.} \texttt{("underwater", "nlos", "reflective\_case")}
+
+\paragraph{Mathematical form.}
+The propagation distance through water is $z = h + x$ (transmitter depth $h$
+plus horizontal offset $x$).  For incidence angle $\phi$ relative to the
+water--air interface:
+\begin{equation}
+\theta_t = \arcsin\!\left(\frac{n_1}{n_2}\sin\phi\right)
+\end{equation}
+
+\textbf{Case 1} ($\phi < \theta_c$, partial transmission via Fresnel):
+\begin{equation}
+\mathcal{F}(\phi) = \frac{1}{2}\left[
+  \left(\frac{\tan(\theta_t - \phi)}{\tan(\theta_t + \phi)}\right)^2
+  + \left(\frac{\sin(\phi - \theta_t)}{\sin(\phi + \theta_t)}\right)^2
+\right]
+\end{equation}
+
+\textbf{Case 2} ($\phi \ge \theta_c$, total internal reflection):
+$\mathcal{F} = 1$.
+
+The received power is:
+\begin{equation}
+\boxed{P_R = P_T\,\eta_T\,\eta_R\;
+\frac{A_{\text{rec}}\,\cos\phi}
+     {2\pi z^3 (\cos\theta_{\min} - \cos\theta_{\max})}
+\; e^{-c\,z} \; \mathcal{F}(\phi)}
+\end{equation}
+
+\paragraph{Code snippet.}
+\begin{lstlisting}
+from owcm.underwater.models.survey_model import TableXIReflective
+
+model = TableXIReflective(link, env,
+    h_m=10.0, x_m=10.0,
+    phi_rad=np.deg2rad(20),
+    theta_min_rad=0.0,
+    theta_max_rad=np.deg2rad(45),
+    n1=1.33, n2=1.0,
+    etaT=0.9, etaR=0.9,
+    attenuation_c=0.05)
+H = model.gain(link, env)
+print(f"Table XI Reflective NLoS gain = {H:.6e}")
+\end{lstlisting}
+
+
+%=============================================================================
+%=============================================================================
+\newpage
+\section{Summary Table}
+%=============================================================================
+%=============================================================================
+
+\begin{table}[H]
+\centering
+\caption{Implemented environment models in \texttt{owcm}.
+\emph{(D) = deterministic gain only; (S) = stochastic sampling supported.}}
+\label{tab:summary}
+\footnotesize
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Environment} & \textbf{Category} & \textbf{Model Key} & \textbf{Type} \\
+\midrule
+Atmospheric & Attenuation & \texttt{beer\_lambert} & D \\
+            & Attenuation & \texttt{kim} & D \\
+            & Attenuation & \texttt{kruse} & D \\
+            & Attenuation & \texttt{al\_naboulsi\_convection} & D \\
+            & Attenuation & \texttt{al\_naboulsi\_advection} & D \\
+            & Attenuation & \texttt{ijaz} & D \\
+            & Attenuation & \texttt{esmail} & D \\
+            & Geometry    & \texttt{uniform\_aperture} & D \\
+            & Geometry    & \texttt{gaussian\_collected\_exact} & D \\
+            & Geometry    & \texttt{gaussian\_collected\_approx} & D \\
+            & Pointing    & \texttt{rayleigh\_gaussian} & S \\
+            & Turbulence  & \texttt{lognormal} & S \\
+            & Turbulence  & \texttt{gamma\_gamma} & S \\
+\midrule
+Indoor      & LoS       & \texttt{lambertian\_los} & D \\
+            & LoS       & \texttt{lambertian\_los\_plus\_nlos} & D \\
+            & NLoS      & \texttt{kbounce} & D \\
+            & Blockage  & \texttt{onoff} & S \\
+            & Blockage  & \texttt{markov} & S \\
+\midrule
+Space       & Free Space  & \texttt{fspl} & D \\
+            & Deep Space  & \texttt{table\_xiii} & D \\
+\midrule
+Underground & LoS       & \texttt{lambertian\_los} & D \\
+            & Dust      & \texttt{exp\_extinction} & D \\
+            & Blockage  & \texttt{onoff} & S \\
+            & Blockage  & \texttt{markov} & S \\
+\midrule
+Underwater  & Extinction & \texttt{a\_plus\_b} / \texttt{c\_direct} & D \\
+            & Link       & \texttt{los\_case} (Eq.\,89) & D \\
+            & Link       & \texttt{retroreflective\_case} (Eq.\,90) & D \\
+            & NLoS       & \texttt{reflective\_case} (Eq.\,91--92) & D \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

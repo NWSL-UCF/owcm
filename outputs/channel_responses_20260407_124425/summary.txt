@@ -1,0 +1,12 @@
+OWCM Channel Response Sweep
+Output directory: outputs\channel_responses_20260407_124425
+Total attempts: 204
+Successful rows: 164
+Errors: 40
+
+Success counts by environment:
+  - atmospheric: 56
+  - indoor: 32
+  - space: 12
+  - underground: 32
+  - underwater: 32

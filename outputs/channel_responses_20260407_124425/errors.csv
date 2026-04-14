@@ -1,0 +1,41 @@
+environment,category,model,distance_m,error
+atmospheric,attenuation,esmail,100.0,"EsmailFog requires parameters k, a, b (from the Esmail regression). Pass k=..., a=..., b=... when building the channel."
+atmospheric,attenuation,esmail,500.0,"EsmailFog requires parameters k, a, b (from the Esmail regression). Pass k=..., a=..., b=... when building the channel."
+atmospheric,attenuation,esmail,1000.0,"EsmailFog requires parameters k, a, b (from the Esmail regression). Pass k=..., a=..., b=... when building the channel."
+atmospheric,attenuation,esmail,2000.0,"EsmailFog requires parameters k, a, b (from the Esmail regression). Pass k=..., a=..., b=... when building the channel."
+atmospheric,pointing,hoyt_gaussian,100.0,Hoyt pointing not implemented yet
+atmospheric,pointing,hoyt_gaussian,500.0,Hoyt pointing not implemented yet
+atmospheric,pointing,hoyt_gaussian,1000.0,Hoyt pointing not implemented yet
+atmospheric,pointing,hoyt_gaussian,2000.0,Hoyt pointing not implemented yet
+atmospheric,pointing,beckmann_gaussian,100.0,Beckmann pointing not implemented yet
+atmospheric,pointing,beckmann_gaussian,500.0,Beckmann pointing not implemented yet
+atmospheric,pointing,beckmann_gaussian,1000.0,Beckmann pointing not implemented yet
+atmospheric,pointing,beckmann_gaussian,2000.0,Beckmann pointing not implemented yet
+space,tx_gain,diffraction_limited,1000.0,DiffLimitedTx.gain() got an unexpected keyword argument 'rng'
+space,tx_gain,diffraction_limited,10000.0,DiffLimitedTx.gain() got an unexpected keyword argument 'rng'
+space,tx_gain,diffraction_limited,50000.0,DiffLimitedTx.gain() got an unexpected keyword argument 'rng'
+space,tx_gain,diffraction_limited,100000.0,DiffLimitedTx.gain() got an unexpected keyword argument 'rng'
+space,rx_gain,telescope,1000.0,TelescopeRx.gain() got an unexpected keyword argument 'rng'
+space,rx_gain,telescope,10000.0,TelescopeRx.gain() got an unexpected keyword argument 'rng'
+space,rx_gain,telescope,50000.0,TelescopeRx.gain() got an unexpected keyword argument 'rng'
+space,rx_gain,telescope,100000.0,TelescopeRx.gain() got an unexpected keyword argument 'rng'
+space,pointing,gaussian,1000.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+space,pointing,gaussian,10000.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+space,pointing,gaussian,50000.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+space,pointing,gaussian,100000.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+space,atmospheric_entry,beer_lambert,1000.0,BeerLambertSpace.gain() got an unexpected keyword argument 'rng'
+space,atmospheric_entry,beer_lambert,10000.0,BeerLambertSpace.gain() got an unexpected keyword argument 'rng'
+space,atmospheric_entry,beer_lambert,50000.0,BeerLambertSpace.gain() got an unexpected keyword argument 'rng'
+space,atmospheric_entry,beer_lambert,100000.0,BeerLambertSpace.gain() got an unexpected keyword argument 'rng'
+space,link_budget,multiplicative_chain,1000.0,LinkBudgetChain.gain() got an unexpected keyword argument 'rng'
+space,link_budget,multiplicative_chain,10000.0,LinkBudgetChain.gain() got an unexpected keyword argument 'rng'
+space,link_budget,multiplicative_chain,50000.0,LinkBudgetChain.gain() got an unexpected keyword argument 'rng'
+space,link_budget,multiplicative_chain,100000.0,LinkBudgetChain.gain() got an unexpected keyword argument 'rng'
+space,deepspace,table_xiii,1000.0,w0_rad (beam divergence) is required for DeepSpaceTableXIII
+space,deepspace,table_xiii,10000.0,w0_rad (beam divergence) is required for DeepSpaceTableXIII
+space,deepspace,table_xiii,50000.0,w0_rad (beam divergence) is required for DeepSpaceTableXIII
+space,deepspace,table_xiii,100000.0,w0_rad (beam divergence) is required for DeepSpaceTableXIII
+underwater,pointing,gaussian,5.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+underwater,pointing,gaussian,10.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+underwater,pointing,gaussian,20.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
+underwater,pointing,gaussian,30.0,GaussianPointing.gain() got an unexpected keyword argument 'rng'
