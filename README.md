@@ -86,6 +86,43 @@ OWCM/
 
 Each environment has a `recipes.py` defining default model stacks (e.g., `mvp`, `clear_air`).
 
-## License
+## Installation and Reproducibility Environment
 
-MIT
+OWCM uses Python 3.13 as the reference environment. The package dependencies required for reproducibility are provided in `requirements-reproducibility.txt` with fixed versions:
+
+- NumPy 2.5.4
+- SciPy 1.18.1
+- Matplotlib 3.11.2
+- pytest 9.1.1
+
+To create and activate a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+On Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+On Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+Install the reproducibility dependencies:
+
+```bash
+pip install -r requirements-reproducibility.txt
+```
+
+Install OWCM:
+
+```bash
+pip install -e .
+```
+
+The pinned dependency versions are provided to facilitate reproducible installation and execution of the OWCM reference implementation.
