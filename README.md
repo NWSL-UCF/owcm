@@ -126,3 +126,5 @@ pip install -e .
 ```
 
 The pinned dependency versions are provided to facilitate reproducible installation and execution of the OWCM reference implementation.
+
+Independent atmospheric validation and implementation limits are documented in `docs/external_validation.md`, including comparison with the 6S radiative-transfer model through Py6S.
