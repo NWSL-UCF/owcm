@@ -68,6 +68,8 @@ Thus, OWCM should not be interpreted as a replacement for a full atmospheric rad
 
 Instead, OWCM provides a computationally lightweight framework for communication-oriented channel analysis in which detailed radiative-transfer results may be incorporated when required.
 
+For a 1-km atmospheric path with a nominal visibility of 2 km, the OWCM Kim model and 6S exhibit the same qualitative trend of increasing transmittance with wavelength, but substantial quantitative differences are observed. The OWCM Kim model predicts transmittances ranging from approximately 0.107 at 450 nm to 0.373 at 1550 nm, whereas the corresponding 6S scattering transmittances range from approximately 0.935 to 0.953. At 1550 nm, for example, OWCM predicts a transmittance of approximately 0.373 compared with approximately 0.953 from 6S. The discrepancy reflects the fundamentally different modeling assumptions of the two approaches: the Kim model is a reduced-order empirical visibility-based attenuation formulation intended for optical communication links, while 6S explicitly resolves wavelength-dependent molecular and aerosol radiative-transfer processes. Accordingly, this comparison is intended to expose the operating scope and implementation limits of OWCM rather than demonstrate numerical equivalence with a full radiative-transfer solver.
+
 ## Reproducibility
 
 The external validation uses
