@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1210812267.svg)](https://doi.org/10.5281/zenodo.23600342)
+
 # OWCM: Optical Wireless Communication Channel Model Library
 
 **OWCM** is a Pythonic, extensible library for modeling Optical Wireless Communication (OWC) channels across various environments: **Atmospheric (FSO)**, **Indoor (VLC/LiFi)**, **Underwater**, **Underground**, and **Space**.
